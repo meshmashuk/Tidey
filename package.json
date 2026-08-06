@@ -1,0 +1,18 @@
+{
+  "name": "tidey",
+  "private": true,
+  "version": "0.1.0",
+  "description": "UK tide times viewer using the ADMIRALTY UK Tidal API",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w server && npm run build -w client",
+    "lint": "npm run lint -w client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
