@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Station } from "../types";
 import { nearestStation } from "../geo";
 
@@ -16,12 +16,26 @@ export function StationPicker({ stations, loading, error, selected, onSelect }: 
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const selectedItemRef = useRef<HTMLLIElement>(null);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return stations;
     return stations.filter((s) => s.name.toLowerCase().includes(q));
   }, [stations, query]);
+
+  // Opening the list with no search yet — jump straight to where the current
+  // station sits alphabetically, rather than always starting at "A". That
+  // keeps it next to its alphabetical neighbours (handy since a station like
+  // "Brighton Marina" is exactly where you'd look for other "Brighton…" names).
+  useEffect(() => {
+    if (!open || query.trim()) return;
+    const container = listRef.current;
+    const item = selectedItemRef.current;
+    if (!container || !item) return;
+    container.scrollTop = item.offsetTop - container.clientHeight / 2 + item.offsetHeight / 2;
+  }, [open, query, selected]);
 
   function choose(station: Station) {
     onSelect(station);
@@ -77,20 +91,38 @@ export function StationPicker({ stations, loading, error, selected, onSelect }: 
           />
 
           {open && results.length > 0 && (
-            <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800">
-              {results.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => choose(s)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-slate-700 hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-700"
-                  >
-                    <span>{s.name}</span>
-                    <span className="ml-2 shrink-0 text-xs text-slate-400 dark:text-slate-500">{s.country}</span>
-                  </button>
-                </li>
-              ))}
+            <ul
+              ref={listRef}
+              className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800"
+            >
+              {results.map((s) => {
+                const isSelected = s.id === selected?.id;
+                return (
+                  <li key={s.id} ref={isSelected ? selectedItemRef : undefined}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => choose(s)}
+                      aria-current={isSelected}
+                      className={`flex w-full items-center justify-between px-3 py-2 text-left ${
+                        isSelected
+                          ? "bg-sky-50 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
+                          : "text-slate-700 hover:bg-sky-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {isSelected && (
+                          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                        <span className={isSelected ? "font-medium" : undefined}>{s.name}</span>
+                      </span>
+                      <span className="ml-2 shrink-0 text-xs text-slate-400 dark:text-slate-500">{s.country}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

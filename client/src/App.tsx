@@ -14,6 +14,9 @@ import type { Station, TidalEvent } from "./types";
 const LAST_STATION_KEY = "tidey:lastStationId";
 const DAYS_AHEAD = 7; // today + next 6 days
 
+const CARD_CLASS =
+  "rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-sky-50/60 to-blue-100/50 p-4 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/50 sm:p-6";
+
 export default function App() {
   const { mode, toggle } = useTheme();
   const { stations, loading: stationsLoading, error: stationsError } = useStations();
@@ -80,7 +83,7 @@ export default function App() {
           <ThemeToggle mode={mode} onToggle={toggle} />
         </header>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+        <section className={CARD_CLASS}>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <StationPicker
               stations={stations}
@@ -99,12 +102,12 @@ export default function App() {
         </section>
 
         {selected && !eventsLoading && !eventsError && events.length > 0 && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-            <TideChart events={events} todayKey={todayKey} stationName={selected.name} />
+          <section className={CARD_CLASS}>
+            <TideChart events={events} dayKey={selectedDay} todayKey={todayKey} stationName={selected.name} />
           </section>
         )}
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+        <section className={CARD_CLASS}>
           {selected && (
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-lg font-semibold">{selected.name}</h2>

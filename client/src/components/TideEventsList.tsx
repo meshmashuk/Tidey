@@ -1,14 +1,6 @@
 import type { TidalEvent } from "../types";
 import { formatTime } from "../format";
-
-export function EventIcon({ type }: { type: TidalEvent["EventType"] }) {
-  const isHigh = type === "HighWater";
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      {isHigh ? <path d="M6 15 12 9l6 6" /> : <path d="M6 9l6 6 6-6" />}
-    </svg>
-  );
-}
+import { TideIcon } from "./TideIcon";
 
 export function TideEventsList({ events }: { events: TidalEvent[] }) {
   if (events.length === 0) {
@@ -39,7 +31,7 @@ export function TideEventsList({ events }: { events: TidalEvent[] }) {
                   : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
               }`}
             >
-              <EventIcon type={event.EventType} />
+              <TideIcon high={isHigh} className="h-5 w-5" />
             </span>
             <div>
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">

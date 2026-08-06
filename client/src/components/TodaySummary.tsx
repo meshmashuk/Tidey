@@ -1,6 +1,6 @@
 import { formatTime } from "../format";
 import type { TidalEvent } from "../types";
-import { EventIcon } from "./TideEventsList";
+import { TideIcon } from "./TideIcon";
 
 export function TodaySummary({ events }: { events: TidalEvent[] }) {
   if (events.length === 0) return null;
@@ -16,7 +16,7 @@ export function TodaySummary({ events }: { events: TidalEvent[] }) {
           return (
             <li key={`${event.DateTime}-${i}`} className="flex items-center gap-2 text-sm">
               <span className={isHigh ? "text-sky-600 dark:text-sky-400" : "text-amber-600 dark:text-amber-400"}>
-                <EventIcon type={event.EventType} />
+                <TideIcon high={isHigh} className="h-4 w-4" />
               </span>
               <span className="text-slate-500 dark:text-slate-400">{isHigh ? "High" : "Low"}</span>
               <span className="ml-auto font-medium text-slate-900 dark:text-slate-100">{formatTime(event.DateTime)}</span>

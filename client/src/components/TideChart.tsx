@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatTimeMs, londonMidnightMs } from "../format";
+import { dayLabel, formatTimeMs, londonMidnightMs } from "../format";
 import { interpolateHeight, sampleCurve, toTidePoints, type TidePoint } from "../tide";
 import type { TidalEvent } from "../types";
 
@@ -45,11 +45,19 @@ function useContainerWidth<T extends HTMLElement>() {
   return [ref, width] as const;
 }
 
-export function TideChart({ events, todayKey, stationName }: { events: TidalEvent[]; todayKey: string; stationName: string }) {
+interface TideChartProps {
+  events: TidalEvent[];
+  dayKey: string;
+  todayKey: string;
+  stationName: string;
+}
+
+export function TideChart({ events, dayKey, todayKey, stationName }: TideChartProps) {
   const [containerRef, width] = useContainerWidth<HTMLDivElement>();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoverT, setHoverT] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const isToday = dayKey === todayKey;
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -57,7 +65,7 @@ export function TideChart({ events, todayKey, stationName }: { events: TidalEven
   }, []);
 
   const points = useMemo(() => toTidePoints(events), [events]);
-  const dayStartMs = useMemo(() => londonMidnightMs(todayKey), [todayKey]);
+  const dayStartMs = useMemo(() => londonMidnightMs(dayKey), [dayKey]);
   const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
 
   const dayEvents = useMemo(
@@ -83,7 +91,7 @@ export function TideChart({ events, todayKey, stationName }: { events: TidalEven
   const linePath = samples.map((s, i) => `${i === 0 ? "M" : "L"}${scaleX(s.t).toFixed(1)},${scaleY(s.h).toFixed(1)}`).join(" ");
   const areaPath = `${linePath} L${scaleX(samples[samples.length - 1].t).toFixed(1)},${baselineY} L${scaleX(samples[0].t).toFixed(1)},${baselineY} Z`;
 
-  const nowInRange = now >= dayStartMs && now <= dayEndMs;
+  const nowInRange = isToday && now >= dayStartMs && now <= dayEndMs;
   const nowHeight = nowInRange ? interpolateHeight(points, now) : null;
 
   // Skip midnight ticks below ~420px — they crowd against the edge labels.
@@ -105,11 +113,13 @@ export function TideChart({ events, todayKey, stationName }: { events: TidalEven
   const hoverY = hoverHeight !== null ? scaleY(hoverHeight) : null;
   const tooltipW = 100;
   const tooltipLeft = hoverX !== null && hoverX > width - tooltipW - 16;
+  const label = dayLabel(dayKey, todayKey);
+  const heading = label === "Today" || label === "Tomorrow" ? `${label}'s tide` : `Tide for ${label}`;
 
   return (
     <div ref={containerRef} className="tide-chart w-full">
       <div className="mb-2 flex items-baseline justify-between">
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Today's tide: {stationName}</h3>
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{heading}: {stationName}</h3>
         <p className="text-xs text-slate-400 dark:text-slate-500">Estimated curve, UK local time</p>
       </div>
 
@@ -121,7 +131,7 @@ export function TideChart({ events, todayKey, stationName }: { events: TidalEven
         className="touch-none select-none"
         style={{ width: "100%", height: `${HEIGHT}px` }}
         role="img"
-        aria-label="Estimated tide height over today, with current position marked"
+        aria-label={`Estimated tide height for ${label}${isToday ? ", with current position marked" : ""}`}
         onPointerMove={(e) => handlePointer(e.clientX)}
         onPointerLeave={() => setHoverT(null)}
       >
