@@ -38,6 +38,11 @@ body {
   --tide-series: #0284c7;
   --tide-series-wash: rgb(2 132 199 / 0.12);
   --tide-border: #e2e8f0;
+  /* day/night background band + sun markers */
+  --tide-day: rgb(255 255 255 / 0);
+  --tide-twilight: rgb(251 146 60 / 0.14);
+  --tide-night: rgb(30 41 99 / 0.12);
+  --tide-sun: #f59e0b;
 }
 .dark .tide-chart {
   --tide-surface: #0f172a;
@@ -49,4 +54,8 @@ body {
   --tide-series: #38bdf8;
   --tide-series-wash: rgb(56 189 248 / 0.16);
   --tide-border: #334155;
+  --tide-day: rgb(56 189 248 / 0.07);
+  --tide-twilight: rgb(251 146 60 / 0.16);
+  --tide-night: rgb(2 6 23 / 0.38);
+  --tide-sun: #fbbf24;
 }

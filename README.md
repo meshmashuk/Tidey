@@ -6,6 +6,7 @@ A web app for checking tide times at nautical stations around the UK, using the
 - Search any of the ~608 UK tidal stations, or use **"nearest to me"** (browser geolocation)
 - High/low water times and heights for **today plus the next 6 days**, with day tabs
 - An **estimated tide curve** for the selected day, with a live "now" marker
+- **Sunrise/sunset markers** and a soft day/night/twilight gradient behind the curve
 - A fixed **"today's highs & lows"** summary panel
 - **Light / dark** theme toggle (seeded from the OS preference, then user-controlled)
 - Responsive layout for mobile, tablet and desktop
@@ -43,7 +44,9 @@ A web app for checking tide times at nautical stations around the UK, using the
 | **Repo** | npm **workspaces** monorepo (one `npm install` at the root installs both) |
 
 No chart or icon libraries are used — the tide curve and all icons are hand-rolled
-inline SVG, so there are no extra runtime dependencies for the visuals.
+inline SVG. The only runtime dependency beyond React is
+[`suncalc`](https://github.com/mourner/suncalc) (~2 KB), used to compute sunrise/sunset
+locally from each station's coordinates (see gotcha #8).
 
 ## Prerequisites
 
@@ -189,6 +192,7 @@ Tidey/
         ├── types.ts          # shared TS types (Station, TidalEvent, …)
         ├── format.ts         # date/time helpers (UTC↔Europe/London, day keys)
         ├── tide.ts           # tide-curve interpolation maths
+        ├── sun.ts            # sunrise/sunset/twilight via suncalc
         ├── geo.ts            # haversine distance + nearest-station
         ├── index.css         # Tailwind import, dark-mode variant, chart CSS vars
         ├── hooks/
@@ -269,6 +273,24 @@ class-based: Tailwind v4's `@custom-variant dark` in `index.css` keys off a `.da
 ### 7. Persisted state (localStorage keys)
 - `tidey:theme` — `"light"` | `"dark"`
 - `tidey:lastStationId` — restores your last station on load (falls back to Brighton Marina)
+
+### 8. Sunrise/sunset is computed locally, not fetched
+The day/night gradient and sunrise/sunset markers on the chart come from
+[`client/src/sun.ts`](client/src/sun.ts), which uses `suncalc` to compute sun times from
+the **station's latitude/longitude** (already in the station data) and the selected date —
+no API, no key, works offline. `suncalc` returns civil twilight (`dawn`/`dusk`) too, which
+drives the soft dawn/dusk colour band; those can be `null` at high latitudes near midsummer
+(twilight all night), so the code falls back gracefully. Colours are CSS variables
+(`--tide-day` / `--tide-twilight` / `--tide-night` / `--tide-sun`) themed for light & dark
+in `index.css`.
+
+> **Dropbox/OneDrive note:** this project lives under a synced folder, and sync clients lock
+> `node_modules/.vite`, which makes Vite's dependency-optimization rename fail with
+> `EBUSY … deps_temp → deps`. To avoid it, `vite.config.ts` sets `cacheDir` to a temp-dir
+> location (`%TEMP%/tidey-vite-cache`) so the cache lives **outside** the synced tree. If you
+> move this project out of a synced folder you can delete that `cacheDir` line to go back to
+> the default `node_modules/.vite`. (The ideal setup is still to keep `node_modules` out of
+> cloud sync entirely — it's large and fully regenerable.)
 
 ## Building for production / deployment
 

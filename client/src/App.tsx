@@ -103,7 +103,14 @@ export default function App() {
 
         {selected && !eventsLoading && !eventsError && events.length > 0 && (
           <section className={CARD_CLASS}>
-            <TideChart events={events} dayKey={selectedDay} todayKey={todayKey} stationName={selected.name} />
+            <TideChart
+              events={events}
+              dayKey={selectedDay}
+              todayKey={todayKey}
+              stationName={selected.name}
+              latitude={selected.latitude}
+              longitude={selected.longitude}
+            />
           </section>
         )}
 
