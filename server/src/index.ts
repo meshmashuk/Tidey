@@ -22,7 +22,7 @@ app.use(stationsErrorHandler);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.join(__dirname, "../../client/dist");
 
-app.use(express.static(clientDist));
+// app.use(express.static(clientDist));
 
 app.get(/^(?!\/api).*/, (_req, res) => {
   res.sendFile(path.join(clientDist, "index.html"));
