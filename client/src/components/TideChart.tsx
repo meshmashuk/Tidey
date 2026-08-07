@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { dayLabel, formatTimeMs, londonMidnightMs } from "../format";
+import { getSunTimes, type SunTimes } from "../sun";
 import { interpolateHeight, sampleCurve, toTidePoints, type TidePoint } from "../tide";
 import type { TidalEvent } from "../types";
 
@@ -50,11 +51,14 @@ interface TideChartProps {
   dayKey: string;
   todayKey: string;
   stationName: string;
+  latitude: number;
+  longitude: number;
 }
 
-export function TideChart({ events, dayKey, todayKey, stationName }: TideChartProps) {
+export function TideChart({ events, dayKey, todayKey, stationName, latitude, longitude }: TideChartProps) {
   const [containerRef, width] = useContainerWidth<HTMLDivElement>();
   const svgRef = useRef<SVGSVGElement>(null);
+  const gradientId = useId();
   const [hoverT, setHoverT] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const isToday = dayKey === todayKey;
@@ -67,6 +71,11 @@ export function TideChart({ events, dayKey, todayKey, stationName }: TideChartPr
   const points = useMemo(() => toTidePoints(events), [events]);
   const dayStartMs = useMemo(() => londonMidnightMs(dayKey), [dayKey]);
   const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
+
+  const sun = useMemo(
+    () => getSunTimes(dayStartMs + 12 * 60 * 60 * 1000, latitude, longitude),
+    [dayStartMs, latitude, longitude],
+  );
 
   const dayEvents = useMemo(
     () => points.filter((p) => p.t >= dayStartMs && p.t <= dayEndMs),
@@ -97,6 +106,11 @@ export function TideChart({ events, dayKey, todayKey, stationName }: TideChartPr
   // Skip midnight ticks below ~420px — they crowd against the edge labels.
   const hourMarks = width < 420 ? [6, 12, 18] : [0, 6, 12, 18, 24];
   const hourTicks = hourMarks.map((h) => dayStartMs + h * 60 * 60 * 1000);
+
+  const dayNightStops = buildDayNightStops(sun, dayStartMs, dayEndMs);
+  const sunMarkers = ([{ t: sun.sunrise, kind: "rise" }, { t: sun.sunset, kind: "set" }] as const).filter(
+    (m): m is { t: number; kind: "rise" | "set" } => m.t !== null && m.t >= dayStartMs && m.t <= dayEndMs,
+  );
 
   function handlePointer(clientX: number) {
     const svg = svgRef.current;
@@ -135,6 +149,19 @@ export function TideChart({ events, dayKey, todayKey, stationName }: TideChartPr
         onPointerMove={(e) => handlePointer(e.clientX)}
         onPointerLeave={() => setHoverT(null)}
       >
+        {dayNightStops.length > 0 && (
+          <>
+            <defs>
+              <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={PAD.left} y1={0} x2={width - PAD.right} y2={0}>
+                {dayNightStops.map((s, i) => (
+                  <stop key={i} offset={s.offset} stopColor={s.color} />
+                ))}
+              </linearGradient>
+            </defs>
+            <rect x={PAD.left} y={PAD.top} width={plotW} height={plotH} fill={`url(#${gradientId})`} />
+          </>
+        )}
+
         {yDomain.ticks.map((tick) => (
           <g key={tick}>
             <line
@@ -178,6 +205,19 @@ export function TideChart({ events, dayKey, todayKey, stationName }: TideChartPr
           );
         })}
 
+        {sunMarkers.map((m) => {
+          const x = scaleX(m.t);
+          return (
+            <g key={m.kind}>
+              <line x1={x} x2={x} y1={PAD.top + 20} y2={baselineY} stroke="var(--tide-sun)" strokeWidth={1} strokeDasharray="2 3" opacity={0.4} />
+              <SunEventIcon x={x} y={PAD.top - 4} kind={m.kind} />
+              <text x={x} y={PAD.top + 26} textAnchor="middle" fontSize={9} fontWeight={500} fill="var(--tide-secondary)">
+                {formatTimeMs(m.t)}
+              </text>
+            </g>
+          );
+        })}
+
         {nowInRange && nowHeight !== null && (
           <g>
             <line x1={scaleX(now)} x2={scaleX(now)} y1={PAD.top} y2={baselineY} stroke="var(--tide-baseline)" strokeWidth={1} />
@@ -214,4 +254,72 @@ function samplesRise(points: TidePoint[], t: number): boolean {
   const before = interpolateHeight(points, t - 5 * 60 * 1000);
   const at = interpolateHeight(points, t);
   return at >= before;
+}
+
+interface GradientStop {
+  offset: number;
+  color: string;
+}
+
+/** Horizontal gradient stops painting night → twilight → day → twilight →
+ * night across the 24h plot. Colours are CSS vars so they adapt to the theme.
+ * Falls back gracefully if civil twilight or the sun times are unavailable. */
+function buildDayNightStops(sun: SunTimes, dayStartMs: number, dayEndMs: number): GradientStop[] {
+  const { sunrise, sunset } = sun;
+  if (sunrise === null || sunset === null) return [];
+
+  const span = dayEndMs - dayStartMs;
+  const frac = (ms: number) => Math.min(1, Math.max(0, (ms - dayStartMs) / span));
+  const dawn = sun.dawn ?? sunrise;
+  const dusk = sun.dusk ?? sunset;
+  const NIGHT = "var(--tide-night)";
+  const DAY = "var(--tide-day)";
+  const TWILIGHT = "var(--tide-twilight)";
+
+  const raw: GradientStop[] = [
+    { offset: 0, color: NIGHT },
+    { offset: frac(dawn), color: NIGHT },
+    { offset: frac((dawn + sunrise) / 2), color: TWILIGHT },
+    { offset: frac(sunrise), color: DAY },
+    { offset: frac(sunset), color: DAY },
+    { offset: frac((sunset + dusk) / 2), color: TWILIGHT },
+    { offset: frac(dusk), color: NIGHT },
+    { offset: 1, color: NIGHT },
+  ];
+
+  // SVG gradient stops must have non-decreasing offsets.
+  let prev = 0;
+  return raw.map(({ offset, color }) => {
+    const clamped = Math.max(prev, offset);
+    prev = clamped;
+    return { offset: clamped, color };
+  });
+}
+
+/** Distinct sunrise vs sunset glyphs: a half-sun over a horizon with rays, plus
+ * an arrow rising out of / dipping toward the horizon. Drawn in a 24×24 space
+ * (scaled down and centred on the marker) so the geometry stays readable. */
+function SunEventIcon({ x, y, kind }: { x: number; y: number; kind: "rise" | "set" }) {
+  const s = 0.72;
+  const arrowHead = kind === "rise" ? "M8 6l4-4 4 4" : "M8 5l4 4 4-4";
+  return (
+    <g
+      transform={`translate(${(x - 12 * s).toFixed(1)} ${y}) scale(${s})`}
+      fill="none"
+      stroke="var(--tide-sun)"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <title>{kind === "rise" ? "Sunrise" : "Sunset"}</title>
+      <path d="M17 18a5 5 0 0 0-10 0" />
+      <path d="M3 18h1.5" />
+      <path d="M19.5 18H21" />
+      <path d="M5.6 11.3l1 1" />
+      <path d="M18.4 11.3l-1 1" />
+      <path d="M12 9V2" />
+      <path d={arrowHead} />
+      <path d="M22 22H2" />
+    </g>
+  );
 }
