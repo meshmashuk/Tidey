@@ -1,6 +1,8 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { stationsErrorHandler, stationsRouter } from "./routes/stations.js";
 
 const app = express();
@@ -16,6 +18,22 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/stations", stationsRouter);
 app.use(stationsErrorHandler);
 
-app.listen(port, () => {
-  console.log(`Tidey proxy server listening on http://localhost:${port}`);
+// --- NEW: serve the built React client in production ---
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const clientDist = path.join(__dirname, "../../client/dist");
+
+app.use(express.static(clientDist));
+
+app.get(/^(?!\/api).*/, (_req, res) => {
+  res.sendFile(path.join(clientDist, "index.html"));
 });
+// --- end new ---
+
+// Only listen on a port locally — Vercel invokes the exported app directly
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Tidey proxy server listening on http://localhost:${port}`);
+  });
+}
+
+export default app;
