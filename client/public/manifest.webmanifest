@@ -1,0 +1,16 @@
+{
+  "name": "Tidey — UK Tide Times",
+  "short_name": "Tidey",
+  "description": "Tide times at nautical stations around the UK.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0c4a6e",
+  "icons": [
+    { "src": "/icon_48.png", "sizes": "48x48", "type": "image/png" },
+    { "src": "/icon_60.png", "sizes": "60x60", "type": "image/png" },
+    { "src": "/icon_180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon.png", "sizes": "327x327", "type": "image/png", "purpose": "any" }
+  ]
+}

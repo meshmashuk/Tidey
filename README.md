@@ -181,10 +181,13 @@ Tidey/
 │       └── routes/
 │           └── stations.ts   # /api/stations and /api/stations/:id/events + error handler
 └── client/
-    ├── index.html
+    ├── index.html            # favicon, apple-touch-icon, manifest + theme-color links
     ├── vite.config.ts        # Vite + React + Tailwind, /api → :8787 dev proxy
     ├── eslint.config.js
     ├── tsconfig*.json
+    ├── public/               # served verbatim at site root (stable, unhashed URLs)
+    │   ├── icon*.png         # favicon / apple-touch / PWA icons
+    │   └── manifest.webmanifest  # PWA manifest (name, icons, theme_color)
     └── src/
         ├── main.tsx          # React entry
         ├── App.tsx           # top-level state, data fetching, layout
@@ -265,10 +268,11 @@ pixel width (1 unit = 1 px). Without this, viewBox scaling shrinks label text to
 illegibility on narrow screens.
 
 ### 6. Theme
-Light/dark only (no "system" mode). It's seeded from the OS `prefers-color-scheme` on first
-visit, then user-controlled and stored in `localStorage` (`tidey:theme`). Dark mode is
-class-based: Tailwind v4's `@custom-variant dark` in `index.css` keys off a `.dark` class on
-`<html>`, toggled in [`useTheme.ts`](client/src/hooks/useTheme.ts).
+Light/dark only (no "system" mode). **Defaults to dark** on first visit, then respects the
+user's choice, stored in `localStorage` (`tidey:theme`). Dark mode is class-based: Tailwind
+v4's `@custom-variant dark` in `index.css` keys off a `.dark` class on `<html>`, toggled in
+[`useTheme.ts`](client/src/hooks/useTheme.ts). A small inline script in `index.html` applies
+the class before first paint so there's no light-mode flash on load.
 
 ### 7. Persisted state (localStorage keys)
 - `tidey:theme` — `"light"` | `"dark"`
