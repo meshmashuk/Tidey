@@ -76,9 +76,17 @@ export default function App() {
     <div className="min-h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <header className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Tidey</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">UK tide times, station by station</p>
+          <div className="flex items-center gap-3">
+            <img
+              src="/icon.png"
+              alt=""
+              aria-hidden="true"
+              className="h-11 w-11 shrink-0 rounded-xl shadow-sm sm:h-12 sm:w-12"
+            />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Tidey</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">UK tide times, station by station</p>
+            </div>
           </div>
           <ThemeToggle mode={mode} onToggle={toggle} />
         </header>
