@@ -170,6 +170,9 @@ The server also caches responses to stay well within the free Discovery tier's l
 Tidey/
 ├── package.json              # root: npm workspaces + dev/build scripts
 ├── package-lock.json
+├── vercel.json               # Vercel build + routing (SPA fallback + /api function)
+├── api/
+│   └── index.ts              # Vercel serverless entry — delegates to the Express app
 ├── server/
 │   ├── .env                  # your API key (git-ignored — create this)
 │   ├── .env.example
@@ -298,23 +301,61 @@ in `index.css`.
 
 ## Building for production / deployment
 
-Currently set up for **local development**. To build:
+To build both workspaces locally:
 
 ```bash
 npm run build          # builds server → server/dist, client → client/dist
 ```
 
-For a real deployment you need two things running:
+### Deployed on Vercel (current setup)
+
+The app deploys to **Vercel** as a single project: the static client and the API run on the
+**same origin**, so the client's relative `/api/*` calls work with no CORS config. Two files
+wire this up:
+
+- [`vercel.json`](vercel.json) — sets `buildCommand` to `npm run build` and `outputDirectory`
+  to `client/dist`, then routes requests with two rewrites:
+
+  | Rewrite | Effect |
+  |---------|--------|
+  | `/api/(.*)` → `/api` | every API request is handled by the serverless function |
+  | `/(.*)` → `/index.html` | everything else falls back to the SPA (static assets in `client/dist` are served directly first; only unmatched paths hit this) |
+
+- [`api/index.ts`](api/index.ts) — the Vercel serverless entry (Vercel auto-detects the `api/`
+  directory). It lazily imports the **compiled** Express app from `server/dist/index.js` and
+  delegates every request to it, caching the import across warm invocations. So the exact same
+  Express app that runs locally also serves the API in production — no separate handler to keep
+  in sync.
+
+The Express app ([`server/src/index.ts`](server/src/index.ts)) guards its `app.listen()` behind
+`if (!process.env.VERCEL)`: locally it listens on `PORT`; on Vercel it's invoked directly by the
+function and never binds a port. `export default app` is what the function imports.
+
+> Because the API function imports `server/dist/index.js`, the server **must** be compiled before
+> the function is bundled. `npm run build` (the configured `buildCommand`) builds the server first,
+> then the client, so this happens automatically.
+
+**Deploy steps:**
+
+1. Connect the repo to a Vercel project (or use the `vercel` CLI).
+2. In **Project Settings → Environment Variables**, add `ADMIRALTY_API_KEY` (for Production and
+   Preview). This is the only required variable — `PORT` is ignored on Vercel, and `CLIENT_ORIGIN`
+   isn't needed since client and API share an origin.
+3. Push to the connected branch. Vercel runs `npm run build`, serves `client/dist` from its CDN,
+   and routes `/api/*` to the function.
+
+### Self-hosting alternative
+
+You don't have to use Vercel. To run it anywhere else you need two things:
 
 1. **The proxy server** (`server/`) with `ADMIRALTY_API_KEY` set in its environment, started
    with `npm run start -w server` (serves the API on `PORT`).
 2. **The static client** (`client/dist/`) served by any static host / CDN.
 
 Point the client's `/api/*` calls at the proxy — either host both behind the same origin
-(simplest: have the proxy also serve `client/dist`), or set `CLIENT_ORIGIN` on the server to
-the client's origin so CORS allows it. The proxy can also be adapted to a serverless function
-(e.g. Vercel/Netlify) — the logic in `admiraltyClient.ts` is host-agnostic; only `index.ts`
-is Express-specific.
+(simplest), or set `CLIENT_ORIGIN` on the server to the client's origin so CORS allows it. The
+serverless logic in `admiraltyClient.ts` is host-agnostic; only the listen/serve wiring is
+Express-specific.
 
 ## Testing
 
