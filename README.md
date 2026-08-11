@@ -8,11 +8,13 @@ A web app for checking tide times at nautical stations around the UK, using the
 - An **estimated tide curve** for the selected day, with a live "now" marker
 - **Sunrise/sunset markers** and a soft day/night/twilight gradient behind the curve
 - A fixed **"today's highs & lows"** summary panel
+- A **"current conditions"** panel — live **weather**, **sea-surface temperature** and
+  **significant wave height** at the selected station, via the [Xweather API](https://www.xweather.com/)
 - **Light / dark** theme toggle (seeded from the OS preference, then user-controlled)
 - Responsive layout for mobile, tablet and desktop
 
-> ⚠️ Tidal predictions here are for general reference only. For navigation, always use
-> official ADMIRALTY products.
+> ⚠️ Tidal predictions and weather/marine data here are for general reference only. For
+> navigation, always use official ADMIRALTY products.
 
 ---
 
@@ -28,6 +30,7 @@ A web app for checking tide times at nautical stations around the UK, using the
 - [Architecture](#architecture)
 - [Project structure](#project-structure)
 - [The ADMIRALTY API (what you need to know)](#the-admiralty-api-what-you-need-to-know)
+- [The Xweather API (what you need to know)](#the-xweather-api-what-you-need-to-know)
 - [Important implementation notes & gotchas](#important-implementation-notes--gotchas)
 - [Building for production / deployment](#building-for-production--deployment)
 - [Testing](#testing)
@@ -43,16 +46,23 @@ A web app for checking tide times at nautical stations around the UK, using the
 | **Server** (`server/`) | Node + [Express](https://expressjs.com/) 4 + TypeScript, run with [tsx](https://github.com/privatenumber/tsx) |
 | **Repo** | npm **workspaces** monorepo (one `npm install` at the root installs both) |
 
-No chart or icon libraries are used — the tide curve and all icons are hand-rolled
-inline SVG. The only runtime dependency beyond React is
+No chart or icon libraries are used — the tide curve, weather glyphs and all icons are
+hand-rolled inline SVG. The only runtime dependency beyond React is
 [`suncalc`](https://github.com/mourner/suncalc) (~2 KB), used to compute sunrise/sunset
 locally from each station's coordinates (see gotcha #8).
+
+The app talks to **two upstream APIs**, both proxied server-side so no key ever reaches
+the browser: the **ADMIRALTY UK Tidal API** (tide times) and the **[Xweather API](https://www.xweather.com/)**
+(current weather + sea-surface temperature + wave height).
 
 ## Prerequisites
 
 - **Node.js 18 or newer** (the server uses the built-in global `fetch`, which requires
   Node 18+). Developed against Node 24 / npm 11.
 - A free **ADMIRALTY "Discovery" API key** — see [Getting an API key](#getting-an-api-key).
+- An **Xweather API** client ID + secret (for the current-conditions panel) — see
+  [Getting an API key](#getting-an-api-key). The app still runs without it; the conditions
+  panel just shows "unavailable".
 
 ## Quick start
 
@@ -82,8 +92,18 @@ by default (or your last-viewed station, remembered in `localStorage`).
 3. Copy your subscription key (an Azure API Management key) into `server/.env` as
    `ADMIRALTY_API_KEY`.
 
-The key is only ever used **server-side** and is never sent to the browser (see
-[Architecture](#architecture)).
+Both the ADMIRALTY key and the Xweather secret are only ever used **server-side** and are
+never sent to the browser (see [Architecture](#architecture)).
+
+### Xweather (current conditions)
+
+1. Register at the [Xweather data portal](https://data.portal.xweather.com/account) and create
+   an app under [Account → Apps](https://data.portal.xweather.com/account/apps).
+2. Each app has a **client ID** and a **client secret** — both are needed. Xweather auth is a
+   pair of query parameters (`client_id` + `client_secret`), not a single header key.
+3. The **conditions** endpoint (current weather) is on the free tier; **maritime** (sea-surface
+   temperature + wave height) may require a paid package — check what your subscription includes.
+4. Put the pair into `server/.env` as `XWEATHER_CLIENT_ID` / `XWEATHER_CLIENT_SECRET`.
 
 ## Environment variables
 
@@ -93,10 +113,14 @@ needs no env file.
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `ADMIRALTY_API_KEY` | **Yes** | — | Your Discovery subscription key, sent as the `Ocp-Apim-Subscription-Key` header |
+| `XWEATHER_CLIENT_ID` | For conditions | — | Xweather app client ID (access ID) |
+| `XWEATHER_CLIENT_SECRET` | For conditions | — | Xweather app client secret |
 | `PORT` | No | `8787` | Port the proxy server listens on |
 | `CLIENT_ORIGIN` | No | `http://localhost:5173` | Allowed CORS origin (only relevant if the client isn't going through the Vite proxy) |
 
 > `server/.env` is git-ignored and must **never** be committed. Recreate it on each machine.
+> If the Xweather vars are absent, the app still runs — only the current-conditions panel
+> reports "unavailable".
 
 ## Available scripts
 
@@ -146,23 +170,26 @@ That's it — there's no database, no global tooling, and no build step required
 
 ```
 Browser (React app, :5173)
-   │  fetch("/api/stations…")        ← relative URLs only
+   │  fetch("/api/stations…"), fetch("/api/conditions…")   ← relative URLs only
    ▼
 Vite dev server proxy  ──►  Express proxy (:8787)
-                                │  adds Ocp-Apim-Subscription-Key header
+                                │  attaches the ADMIRALTY key (header) /
+                                │  Xweather client_id+secret (query params)
                                 │  caches responses (in-memory TTL)
-                                ▼
-                       ADMIRALTY UK Tidal API (Azure)
+                                ├──►  ADMIRALTY UK Tidal API (Azure)
+                                └──►  Xweather API (data.api.xweather.com)
 ```
 
-**Why a proxy?** The ADMIRALTY API authenticates with a subscription key sent in a request
-header. If the browser called the API directly, that key would be visible in the page
-source / network tab to anyone. So the browser only ever talks to our own Express server
-(using relative `/api/*` URLs), and the server attaches the key and forwards the request.
-The server also caches responses to stay well within the free Discovery tier's limits:
+**Why a proxy?** Both upstream APIs authenticate with secrets — the ADMIRALTY API with a
+subscription-key header, Xweather with a `client_id`+`client_secret` query pair. If the
+browser called either directly, those secrets would be visible in the page source / network
+tab to anyone. So the browser only ever talks to our own Express server (using relative
+`/api/*` URLs), and the server attaches the secret and forwards the request. The server
+also caches responses to stay well within each free tier's limits:
 
 - **Station list:** cached 24 h (it essentially never changes)
 - **Tidal events:** cached 30 min per station (predictions don't change within a day)
+- **Conditions (weather + sea):** cached 10 min per rounded coordinate
 
 ## Project structure
 
@@ -180,9 +207,11 @@ Tidey/
 │   └── src/
 │       ├── index.ts          # Express app, CORS, routes, listen
 │       ├── admiraltyClient.ts# calls ADMIRALTY API, holds the key, caching + types
+│       ├── xweatherClient.ts # calls Xweather conditions + maritime, holds the secret, caching
 │       ├── cache.ts          # tiny in-memory TTL cache
 │       └── routes/
-│           └── stations.ts   # /api/stations and /api/stations/:id/events + error handler
+│           ├── stations.ts   # /api/stations and /api/stations/:id/events + error handler
+│           └── conditions.ts # /api/conditions?lat=&lng= (weather + sea temp + wave height)
 └── client/
     ├── index.html            # favicon, apple-touch-icon, manifest + theme-color links
     ├── vite.config.ts        # Vite + React + Tailwind, /api → :8787 dev proxy
@@ -195,7 +224,7 @@ Tidey/
         ├── main.tsx          # React entry
         ├── App.tsx           # top-level state, data fetching, layout
         ├── api.ts            # client-side fetch wrappers + event sanitising
-        ├── types.ts          # shared TS types (Station, TidalEvent, …)
+        ├── types.ts          # shared TS types (Station, TidalEvent, Conditions, …)
         ├── format.ts         # date/time helpers (UTC↔Europe/London, day keys)
         ├── tide.ts           # tide-curve interpolation maths
         ├── sun.ts            # sunrise/sunset/twilight via suncalc
@@ -210,6 +239,8 @@ Tidey/
             ├── TideChart.tsx      # the SVG tide curve for the selected day
             ├── TideEventsList.tsx # high/low cards for the selected day
             ├── TodaySummary.tsx   # compact "today's highs & lows" panel
+            ├── CurrentConditions.tsx # weather + sea temp + wave height blocks
+            ├── WeatherIcon.tsx    # hand-rolled inline-SVG weather glyphs (Xweather codes)
             ├── TideIcon.tsx       # the "porthole" high/low glyph
             └── ThemeToggle.tsx    # light/dark button
 ```
@@ -229,6 +260,28 @@ Tidey/
   **no way to fetch past days** on this tier — this matters for the tide curve (see below).
 - **Tidal event shape:** `{ EventType: "HighWater" | "LowWater", DateTime, Height,
   IsApproximateTime, IsApproximateHeight, Filtered }`.
+
+## The Xweather API (what you need to know)
+
+- **Base URL:** `https://data.api.xweather.com`
+- **Auth:** `client_id` + `client_secret` **query parameters** (not a header). Get them from
+  [Getting an API key](#getting-an-api-key).
+- **Endpoints used** (via our proxy — the client calls only `/api/conditions`, which fans
+  out to both upstream endpoints in parallel):
+
+  | Client → proxy | Proxy → Xweather | Returns |
+  |----------------|------------------|---------|
+  | `GET /api/conditions?lat=&lng=` | `GET /conditions/{lat},{lng}` | Current weather at the exact point (temp, description, wind, humidity, `weatherPrimaryCoded`, `isDay`) |
+  | `GET /api/conditions?lat=&lng=` | `GET /maritime/{lat},{lng}?to=now` | Sea-surface temperature (°C) + significant wave height (m) |
+
+- **`conditions` vs `observations`:** we deliberately use **`conditions`** (a gridded model
+  value at the *exact* coordinate), **not** `observations` — the latter returns the nearest
+  physical METAR station, which for a coastal tidal station can be tens of km inland.
+- **Response shape:** both endpoints wrap data as `{ success, error, response: [ { periods: [ … ] } ] }`;
+  we read `response[0].periods[0]`. See [`server/src/xweatherClient.ts`](server/src/xweatherClient.ts).
+- **Graceful degradation:** the two upstream calls run under `Promise.allSettled`, so if one
+  fails (e.g. maritime isn't in your plan) the other still renders; if both fail the route
+  errors and the panel shows "unavailable".
 
 ## Important implementation notes & gotchas
 
@@ -291,6 +344,23 @@ drives the soft dawn/dusk colour band; those can be `null` at high latitudes nea
 (`--tide-day` / `--tide-twilight` / `--tide-night` / `--tide-sun`) themed for light & dark
 in `index.css`.
 
+### 9. Xweather conditions are fetched server-side and combined
+The current-conditions panel is driven by one client call to `/api/conditions?lat=&lng=`,
+passing the **selected station's coordinates** (already in the station data). The server
+([`xweatherClient.ts`](server/src/xweatherClient.ts)) fans that out to Xweather's `conditions`
+and `maritime` endpoints in parallel, caches the combined result 10 min per rounded
+coordinate, and returns `{ weather, sea }` (either half may be `null`). The weather glyph is
+hand-rolled inline SVG mapped from Xweather's `weatherPrimaryCoded` category
+([`WeatherIcon.tsx`](client/src/components/WeatherIcon.tsx)) — no icon library, matching the
+tide/sun SVGs. **Wave height** is Xweather's *significant* wave height (mean of the highest
+third of waves), the standard oceanographic measure. All secrets stay server-side.
+
+> **`server/.env` and cwd:** `dotenv` loads `.env` relative to the current working directory.
+> The canonical run paths (`npm run dev`, `npm run start -w server`) run with `server/` as the
+> cwd, so `server/.env` is found. Launching the compiled server from the repo root instead
+> (`node server/dist/index.js`) would look for `./.env` and miss the keys — run it from
+> `server/`, or via the npm scripts.
+
 > **Dropbox/OneDrive note:** this project lives under a synced folder, and sync clients lock
 > `node_modules/.vite`, which makes Vite's dependency-optimization rename fail with
 > `EBUSY … deps_temp → deps`. To avoid it, `vite.config.ts` sets `cacheDir` to a temp-dir
@@ -338,9 +408,10 @@ function and never binds a port. `export default app` is what the function impor
 **Deploy steps:**
 
 1. Connect the repo to a Vercel project (or use the `vercel` CLI).
-2. In **Project Settings → Environment Variables**, add `ADMIRALTY_API_KEY` (for Production and
-   Preview). This is the only required variable — `PORT` is ignored on Vercel, and `CLIENT_ORIGIN`
-   isn't needed since client and API share an origin.
+2. In **Project Settings → Environment Variables** (for Production and Preview), add
+   `ADMIRALTY_API_KEY` (required) plus `XWEATHER_CLIENT_ID` and `XWEATHER_CLIENT_SECRET` (for the
+   current-conditions panel). `PORT` is ignored on Vercel, and `CLIENT_ORIGIN` isn't needed since
+   client and API share an origin.
 3. Push to the connected branch. Vercel runs `npm run build`, serves `client/dist` from its CDN,
    and routes `/api/*` to the function.
 
@@ -348,8 +419,9 @@ function and never binds a port. `export default app` is what the function impor
 
 You don't have to use Vercel. To run it anywhere else you need two things:
 
-1. **The proxy server** (`server/`) with `ADMIRALTY_API_KEY` set in its environment, started
-   with `npm run start -w server` (serves the API on `PORT`).
+1. **The proxy server** (`server/`) with `ADMIRALTY_API_KEY` (and, for the conditions panel,
+   `XWEATHER_CLIENT_ID` + `XWEATHER_CLIENT_SECRET`) set in its environment, started with
+   `npm run start -w server` (serves the API on `PORT`).
 2. **The static client** (`client/dist/`) served by any static host / CDN.
 
 Point the client's `/api/*` calls at the proxy — either host both behind the same origin
@@ -375,5 +447,7 @@ manual click-through in the browser.
 | Station data loads but events fail with a 502 | Key is wrong/expired, or Discovery subscription lapsed |
 | Tide times look an hour off | Almost certainly a timezone regression — see gotcha #1 |
 | App goes blank after picking a station | A malformed-event regression — see gotcha #2 |
+| Conditions panel says "unavailable" | `XWEATHER_CLIENT_ID`/`XWEATHER_CLIENT_SECRET` missing or wrong in `server/.env`, or the server was started from the repo root instead of `server/` — see gotcha #9 |
+| Sea temp / wave height missing but weather shows | Your Xweather plan may not include the **maritime** endpoint — the weather half still renders (graceful degradation) |
 | `npm audit` flags esbuild/vite (moderate) | Known dev-server-only advisory; doesn't affect production builds. Left as-is to avoid a breaking Vite major bump |
 | Port already in use | Change `PORT` in `server/.env` (and the proxy target in `client/vite.config.ts`) |

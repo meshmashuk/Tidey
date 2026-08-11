@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchTidalEvents } from "./api";
+import { fetchConditions, fetchTidalEvents } from "./api";
+import { CurrentConditions } from "./components/CurrentConditions";
 import { DaySelector } from "./components/DaySelector";
 import { StationPicker } from "./components/StationPicker";
 import { ThemeToggle } from "./components/ThemeToggle";
@@ -9,7 +10,7 @@ import { TodaySummary } from "./components/TodaySummary";
 import { londonDateKey } from "./format";
 import { useStations } from "./hooks/useStations";
 import { useTheme } from "./hooks/useTheme";
-import type { Station, TidalEvent } from "./types";
+import type { Conditions, Station, TidalEvent } from "./types";
 
 const LAST_STATION_KEY = "tidey:lastStationId";
 const DAYS_AHEAD = 7; // today + next 6 days
@@ -25,6 +26,10 @@ export default function App() {
   const [events, setEvents] = useState<TidalEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
+
+  const [conditions, setConditions] = useState<Conditions | null>(null);
+  const [conditionsLoading, setConditionsLoading] = useState(false);
+  const [conditionsError, setConditionsError] = useState<string | null>(null);
 
   const todayKey = useMemo(() => londonDateKey(new Date().toISOString()), []);
   const [selectedDay, setSelectedDay] = useState(todayKey);
@@ -49,6 +54,30 @@ export default function App() {
       .catch((err: unknown) => setEventsError(err instanceof Error ? err.message : "Failed to load tide times"))
       .finally(() => setEventsLoading(false));
   }, [selected, todayKey]);
+
+  // Current weather + sea temperature at the selected station's coordinates.
+  useEffect(() => {
+    if (!selected) return;
+    let cancelled = false;
+    setConditions(null);
+    setConditionsError(null);
+    setConditionsLoading(true);
+
+    fetchConditions(selected.latitude, selected.longitude)
+      .then((data) => {
+        if (!cancelled) setConditions(data);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setConditionsError(err instanceof Error ? err.message : "Failed to load conditions");
+      })
+      .finally(() => {
+        if (!cancelled) setConditionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, TidalEvent[]>();
@@ -108,6 +137,12 @@ export default function App() {
             )}
           </div>
         </section>
+
+        {selected && (
+          <section className={CARD_CLASS}>
+            <CurrentConditions conditions={conditions} loading={conditionsLoading} error={conditionsError} />
+          </section>
+        )}
 
         {selected && !eventsLoading && !eventsError && events.length > 0 && (
           <section className={CARD_CLASS}>

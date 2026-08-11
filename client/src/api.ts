@@ -1,5 +1,5 @@
 import { toUtcDate } from "./format";
-import type { Station, StationFeatureCollection, TidalEvent } from "./types";
+import type { Conditions, Station, StationFeatureCollection, TidalEvent } from "./types";
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -41,4 +41,9 @@ function isUsableEvent(e: TidalEvent): boolean {
 export async function fetchTidalEvents(stationId: string, duration = 7): Promise<TidalEvent[]> {
   const events = await getJson<TidalEvent[]>(`/api/stations/${encodeURIComponent(stationId)}/events?duration=${duration}`);
   return events.filter(isUsableEvent);
+}
+
+/** Current weather + sea-surface temperature at the station's coordinates. */
+export async function fetchConditions(latitude: number, longitude: number): Promise<Conditions> {
+  return getJson<Conditions>(`/api/conditions?lat=${latitude}&lng=${longitude}`);
 }

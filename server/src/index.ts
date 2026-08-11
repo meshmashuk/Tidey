@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { conditionsErrorHandler, conditionsRouter } from "./routes/conditions.js";
 import { stationsErrorHandler, stationsRouter } from "./routes/stations.js";
 
 const app = express();
@@ -17,6 +18,9 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/stations", stationsRouter);
 app.use(stationsErrorHandler);
+
+app.use("/api/conditions", conditionsRouter);
+app.use(conditionsErrorHandler);
 
 // --- NEW: serve the built React client in production ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

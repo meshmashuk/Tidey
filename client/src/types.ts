@@ -23,6 +23,29 @@ export interface StationFeatureCollection {
   }>;
 }
 
+export interface CurrentWeather {
+  tempC: number;
+  weather: string;
+  weatherCoded: string;
+  windDir: string;
+  windSpeedMPH: number;
+  humidity: number;
+  isDay: boolean;
+  place: string | null;
+  observedISO: string;
+}
+
+export interface SeaConditions {
+  seaSurfaceTemperatureC: number | null;
+  significantWaveHeightM: number | null;
+  observedISO: string;
+}
+
+export interface Conditions {
+  weather: CurrentWeather | null;
+  sea: SeaConditions | null;
+}
+
 export type TidalEventType = "HighWater" | "LowWater";
 
 export interface TidalEvent {
