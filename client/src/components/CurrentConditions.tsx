@@ -3,7 +3,7 @@ import type { Conditions } from "../types";
 import { WeatherIcon } from "./WeatherIcon";
 
 const BLOCK_CLASS =
-  "flex-1 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40";
+  "flex-1 rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-800/40 sm:p-4";
 
 /** A small "sea temperature" ripple glyph, matching the hand-rolled SVG style. */
 function WaveIcon({ className = "h-8 w-8" }: { className?: string }) {
@@ -39,7 +39,7 @@ export function CurrentConditions({
 }) {
   return (
     <div>
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:mb-3">
         Current conditions
       </h2>
 
@@ -47,17 +47,17 @@ export function CurrentConditions({
       {!loading && error && <p className="text-sm text-slate-500 dark:text-slate-400">Conditions unavailable.</p>}
 
       {!loading && !error && conditions && (
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
           {/* Weather */}
           <div className={BLOCK_CLASS}>
             {conditions.weather ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3">
                 <span className="text-amber-500 dark:text-amber-300">
-                  <WeatherIcon coded={conditions.weather.weatherCoded} isDay={conditions.weather.isDay} className="h-10 w-10" />
+                  <WeatherIcon coded={conditions.weather.weatherCoded} isDay={conditions.weather.isDay} className="h-8 w-8 sm:h-10 sm:w-10" />
                 </span>
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                    <span className="text-xl font-semibold text-slate-900 dark:text-slate-100 sm:text-2xl">
                       {Math.round(conditions.weather.tempC)}°C
                     </span>
                     <span className="truncate text-sm text-slate-500 dark:text-slate-400">
@@ -78,12 +78,12 @@ export function CurrentConditions({
           {/* Sea temperature */}
           <div className={BLOCK_CLASS}>
             {conditions.sea && conditions.sea.seaSurfaceTemperatureC != null ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3">
                 <span className="text-sky-600 dark:text-sky-400">
-                  <WaveIcon className="h-10 w-10" />
+                  <WaveIcon className="h-8 w-8 sm:h-10 sm:w-10" />
                 </span>
                 <div className="min-w-0">
-                  <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                  <div className="text-xl font-semibold text-slate-900 dark:text-slate-100 sm:text-2xl">
                     {conditions.sea.seaSurfaceTemperatureC.toFixed(1)}°C
                   </div>
                   <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
@@ -99,12 +99,12 @@ export function CurrentConditions({
           {/* Wave height */}
           <div className={BLOCK_CLASS}>
             {conditions.sea && conditions.sea.significantWaveHeightM != null ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3">
                 <span className="text-teal-600 dark:text-teal-400">
-                  <SwellIcon className="h-10 w-10" />
+                  <SwellIcon className="h-8 w-8 sm:h-10 sm:w-10" />
                 </span>
                 <div className="min-w-0">
-                  <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                  <div className="text-xl font-semibold text-slate-900 dark:text-slate-100 sm:text-2xl">
                     {conditions.sea.significantWaveHeightM.toFixed(1)} m
                   </div>
                   <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
